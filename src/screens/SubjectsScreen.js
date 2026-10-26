@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,24 +8,90 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { studentInfo, subjects, schedule, assignments, grades } from '../data/mockData';
+import { getCourses } from '../api/courseApi';
+import { getGrades } from '../api/gradeApi';
+import useCachedApi from '../hooks/useCachedApi';
+
 
 const SubjectsScreen = ({ navigation }) => {
   const [keyword, setKeyword] = useState('');
+  const fetchGrades = useCallback(() => getGrades(), []);
+
+  const {
+    data: grades,
+    loading: gradesLoading,
+    error: gradesError,
+  } = useCachedApi('grades', fetchGrades);
+
+  // Lấy danh sách môn học từ API.
+  const fetchCourses = useCallback(() => getCourses(), []);
+
+  // Tự động dùng cache nếu mất mạng hoặc API lỗi.
+  const {
+    data: apiCourses,
+    loading,
+    error,
+    source,
+    refresh,
+  } = useCachedApi('courses', fetchCourses);
+
+  // Chuyển tên trường API sang tên trường giao diện đang sử dụng.
+  const subjectsFromApi = useMemo(() => {
+    return apiCourses.map((course) => {
+      const grade = grades.find(
+        (item) => String(item.courseId) === String(course.id)
+      );
+
+      // Chỉ tính những điểm thực sự đã có.
+      const scores = [
+        grade?.processScore,
+        grade?.midtermScore,
+        grade?.finalScore,
+      ].filter(
+        (score) =>
+          score !== null &&
+          score !== undefined &&
+          score !== '' &&
+          Number.isFinite(Number(score))
+      ).map(Number);
+
+      // Quy đổi điểm trung bình thang 10 thành phần trăm.
+      const tienDo = scores.length
+        ? Math.round(
+            (scores.reduce((sum, score) => sum + score, 0) /
+              scores.length) *
+              10
+          )
+        : 0;
+
+      return {
+        id: course.id,
+        maMH: course.id,
+        tenMH: course.name,
+        soTinChi: course.credits,
+        giangVien: course.teacher,
+        tienDo,
+      };
+    });
+  }, [apiCourses, grades]);
 
   const subjectList = useMemo(() => {
-    if (!keyword.trim()) {
-      return subjects;
-    }
     const lowerKey = keyword.toLowerCase().trim();
-    return subjects.filter(
+
+    if (!lowerKey) {
+      return subjectsFromApi;
+    }
+
+    return subjectsFromApi.filter(
       (item) =>
-        item.tenMH.toLowerCase().includes(lowerKey) ||
-        item.maMH.toLowerCase().includes(lowerKey)
+        item.tenMH?.toLowerCase().includes(lowerKey) ||
+        item.maMH?.toLowerCase().includes(lowerKey)
     );
-  }, [keyword]);
+  }, [keyword, subjectsFromApi]);
+
 
   const renderSubjectCard = ({ item }) => {
     return (
@@ -88,6 +154,55 @@ const SubjectsScreen = ({ navigation }) => {
       </Text>
     </View>
   );
+  
+const renderEmptyState = () => {
+  if (loading) {
+    return (
+      <View style={styles.notFoundBox}>
+        <ActivityIndicator size="large" color="#10B981" />
+        <Text style={styles.notFoundDesc}>
+          Đang tải danh sách môn học...
+        </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.notFoundBox}>
+        <Ionicons
+          name="cloud-offline-outline"
+          size={48}
+          color="#94A3B8"
+        />
+        <Text style={styles.notFoundTitle}>
+          Không tải được môn học
+        </Text>
+        <Text style={styles.notFoundDesc}>
+          Kiểm tra kết nối mạng và json-server.
+        </Text>
+
+        <TouchableOpacity
+          onPress={refresh}
+          style={{
+            marginTop: 14,
+            backgroundColor: '#10B981',
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 10,
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>
+            Thử lại
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return renderNoResults();
+};
+
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -98,6 +213,7 @@ const SubjectsScreen = ({ navigation }) => {
           <Text style={styles.headerMainTitle}>Danh Sách Học Phần</Text>
           <Text style={styles.headerSubTitle}>
             Hiển thị {subjectList.length} môn học trong học kỳ
+            {source === 'cache' ? ' · Dữ liệu offline' : ''}
           </Text>
         </View>
 
@@ -122,11 +238,13 @@ const SubjectsScreen = ({ navigation }) => {
         {/* Subjects List */}
         <FlatList
           data={subjectList}
-          keyExtractor={(item) => item.id || item.maMH}
+          keyExtractor={(item) => String(item.id || item.maMH)}
           renderItem={renderSubjectCard}
-          ListEmptyComponent={renderNoResults}
+          ListEmptyComponent={renderEmptyState}
           contentContainerStyle={styles.scrollListPadding}
           showsVerticalScrollIndicator={false}
+          refreshing={loading}
+          onRefresh={refresh}
         />
       </View>
     </SafeAreaView>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,20 +10,68 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { studentInfo, subjects, schedule, assignments, grades } from '../data/mockData';
+
+import { studentInfo } from '../data/mockData';
+import { getGrades } from '../api/gradeApi';
+import { getCourses } from '../api/courseApi';
+import useCachedApi from '../hooks/useCachedApi';
 
 const STORAGE_KEY = 'student_profile';
 
+const fetchProfileGrades = async () => {
+  const [grades, courses] = await Promise.all([
+    getGrades(),
+    getCourses(),
+  ]);
+
+  return grades.map(grade => {
+    const course = courses.find(
+      item => String(item.id) === String(grade.courseId),
+    );
+
+    return {
+      ...grade,
+      id: String(grade.id),
+      tenMH:
+        course?.name ||
+        course?.title ||
+        course?.tenMH ||
+        'Chưa có tên môn học',
+      maMH: grade.courseId,
+      diemQuaTrinh: grade.processScore ?? grade.diemQuaTrinh ?? null,
+      diemGiuaKy: grade.midtermScore ?? grade.diemGiuaKy ?? null,
+      diemCuoiKy: grade.finalScore ?? grade.diemCuoiKy ?? null,
+      trangThai:
+        (grade.finalScore ?? grade.diemCuoiKy) !== null &&
+        (grade.finalScore ?? grade.diemCuoiKy) !== undefined &&
+        (grade.finalScore ?? grade.diemCuoiKy) !== ''
+          ? 'Hoàn thành'
+          : 'Đang học',
+    };
+  });
+};
+
 const ProfileScreen = ({ navigation }) => {
+  const {
+    data: profileGrades,
+    loading: gradesLoading,
+    error: gradesError,
+    source: gradesSource,
+    refresh: refreshGrades,
+  } = useCachedApi('profile_grades_combined', fetchProfileGrades);
+
   const [profile, setProfile] = useState(studentInfo);
   const [isEditing, setIsEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [editForm, setEditForm] = useState({
-    hoTen: studentInfo.hoTen,
-    email: studentInfo.email,
-    soDienThoai: studentInfo.soDienThoai,
+    hoTen: studentInfo.hoTen || '',
+    email: studentInfo.email || '',
+    soDienThoai: studentInfo.soDienThoai || '',
   });
 
   useEffect(() => {
@@ -32,13 +81,17 @@ const ProfileScreen = ({ navigation }) => {
   const loadSavedProfile = async () => {
     try {
       const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+
       if (savedData !== null) {
         const parsed = JSON.parse(savedData);
-        setProfile((prev) => ({ ...prev, ...parsed }));
+
+        setProfile(prev => ({ ...prev, ...parsed }));
+
         setEditForm({
-          hoTen: parsed.hoTen || studentInfo.hoTen,
-          email: parsed.email || studentInfo.email,
-          soDienThoai: parsed.soDienThoai || studentInfo.soDienThoai,
+          hoTen: parsed.hoTen || studentInfo.hoTen || '',
+          email: parsed.email || studentInfo.email || '',
+          soDienThoai:
+            parsed.soDienThoai || studentInfo.soDienThoai || '',
         });
       }
     } catch (error) {
@@ -46,21 +99,33 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      await refreshGrades();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshGrades]);
+
   const handleStartEditing = () => {
     setEditForm({
-      hoTen: profile.hoTen,
-      email: profile.email,
-      soDienThoai: profile.soDienThoai,
+      hoTen: profile.hoTen || '',
+      email: profile.email || '',
+      soDienThoai: profile.soDienThoai || '',
     });
+
     setIsEditing(true);
   };
 
   const handleCancelEditing = () => {
     setEditForm({
-      hoTen: profile.hoTen,
-      email: profile.email,
-      soDienThoai: profile.soDienThoai,
+      hoTen: profile.hoTen || '',
+      email: profile.email || '',
+      soDienThoai: profile.soDienThoai || '',
     });
+
     setIsEditing(false);
   };
 
@@ -77,9 +142,15 @@ const ProfileScreen = ({ navigation }) => {
         email: editForm.email.trim(),
         soDienThoai: editForm.soDienThoai.trim(),
       };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProfile));
+
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(updatedProfile),
+      );
+
       setProfile(updatedProfile);
       setIsEditing(false);
+
       Alert.alert('Thành công', 'Đã lưu thông tin cá nhân!');
     } catch (error) {
       console.error('Lỗi khi lưu thông tin:', error);
@@ -87,97 +158,182 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  // Tính chữ cái đầu của tên (ví dụ: Nguyễn Văn An -> NA)
-  const getInitials = (name) => {
+  const getInitials = name => {
     if (!name) return 'SV';
+
     const words = name.trim().split(/\s+/);
-    if (words.length === 1) return words[0].substring(0, 1).toUpperCase();
-    return (words[0].substring(0, 1) + words[words.length - 1].substring(0, 1)).toUpperCase();
+
+    if (words.length === 1) {
+      return words[0].substring(0, 1).toUpperCase();
+    }
+
+    return (
+      words[0].substring(0, 1) +
+      words[words.length - 1].substring(0, 1)
+    ).toUpperCase();
   };
 
-  const getScoreColor = (score) => {
-    if (score === null || score === undefined) return '#8E8E93';
-    if (score >= 8.5) return '#2ECC71';
-    if (score >= 7.0) return '#4A90D9';
-    if (score >= 5.0) return '#F39C12';
+  const getScoreColor = score => {
+    if (score === null || score === undefined || score === '') {
+      return '#8E8E93';
+    }
+
+    const number = Number(score);
+
+    if (!Number.isFinite(number)) return '#8E8E93';
+    if (number >= 8.5) return '#2ECC71';
+    if (number >= 7) return '#4A90D9';
+    if (number >= 5) return '#F39C12';
+
     return '#E74C3C';
+  };
+
+  const formatScore = score => {
+    if (score === null || score === undefined || score === '') {
+      return '--';
+    }
+
+    const number = Number(score);
+
+    return Number.isFinite(number) ? number.toFixed(1) : '--';
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5F7FA" />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#F5F7FA"
+      />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#4A90D9']}
+          />
+        }
       >
-        {/* Header với Avatar */}
+        {/* Header sinh viên */}
         <View style={styles.headerCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{getInitials(profile.hoTen)}</Text>
+              <Text style={styles.avatarText}>
+                {getInitials(profile.hoTen)}
+              </Text>
             </View>
+
             <View style={styles.avatarBadge}>
-              <Ionicons name="checkmark-sharp" size={14} color="#FFFFFF" />
+              <Ionicons
+                name="checkmark-sharp"
+                size={14}
+                color="#FFFFFF"
+              />
             </View>
           </View>
+
           <Text style={styles.nameHeader}>{profile.hoTen}</Text>
-          <Text style={styles.maSVHeader}>Mã SV: {profile.maSV}</Text>
+          <Text style={styles.maSVHeader}>
+            Mã SV: {profile.maSV}
+          </Text>
+
           <View style={styles.tagContainer}>
             <View style={styles.tag}>
-              <Ionicons name="school-outline" size={13} color="#4A90D9" />
+              <Ionicons
+                name="school-outline"
+                size={13}
+                color="#4A90D9"
+              />
               <Text style={styles.tagText}>{profile.lop}</Text>
             </View>
+
             <View style={[styles.tag, styles.tagNganh]}>
-              <Ionicons name="briefcase-outline" size={13} color="#27AE60" />
-              <Text style={[styles.tagText, styles.tagTextNganh]}>{profile.nganh}</Text>
+              <Ionicons
+                name="briefcase-outline"
+                size={13}
+                color="#27AE60"
+              />
+              <Text style={[styles.tagText, styles.tagTextNganh]}>
+                {profile.nganh}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Thông tin chi tiết */}
+        {/* Thông tin cá nhân */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="person-outline" size={20} color="#4A90D9" />
-              <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
+              <Ionicons
+                name="person-outline"
+                size={20}
+                color="#4A90D9"
+              />
+              <Text style={styles.sectionTitle}>
+                Thông tin cá nhân
+              </Text>
             </View>
-            {!isEditing ? (
+
+            {!isEditing && (
               <TouchableOpacity
                 style={styles.editButton}
                 activeOpacity={0.7}
                 onPress={handleStartEditing}
               >
-                <Ionicons name="create-outline" size={16} color="#4A90D9" />
-                <Text style={styles.editButtonText}>Chỉnh sửa</Text>
+                <Ionicons
+                  name="create-outline"
+                  size={16}
+                  color="#4A90D9"
+                />
+                <Text style={styles.editButtonText}>
+                  Chỉnh sửa
+                </Text>
               </TouchableOpacity>
-            ) : null}
+            )}
           </View>
 
           <View style={styles.divider} />
 
-          {/* Hàng: Mã sinh viên (chỉ đọc) */}
+          {/* Mã sinh viên */}
           <View style={styles.infoRow}>
             <View style={styles.iconWrapper}>
-              <Ionicons name="card-outline" size={18} color="#4A90D9" />
+              <Ionicons
+                name="card-outline"
+                size={18}
+                color="#4A90D9"
+              />
             </View>
+
             <View style={styles.infoContent}>
               <Text style={styles.label}>Mã sinh viên</Text>
-              <Text style={styles.valueReadOnly}>{profile.maSV}</Text>
+              <Text style={styles.valueReadOnly}>
+                {profile.maSV}
+              </Text>
             </View>
           </View>
 
-          {/* Hàng: Họ và tên */}
+          {/* Họ và tên */}
           <View style={styles.infoRow}>
             <View style={styles.iconWrapper}>
-              <Ionicons name="person-circle-outline" size={18} color="#4A90D9" />
+              <Ionicons
+                name="person-circle-outline"
+                size={18}
+                color="#4A90D9"
+              />
             </View>
+
             <View style={styles.infoContent}>
               <Text style={styles.label}>Họ và tên</Text>
+
               {isEditing ? (
                 <TextInput
                   style={styles.input}
                   value={editForm.hoTen}
-                  onChangeText={(text) => setEditForm((prev) => ({ ...prev, hoTen: text }))}
+                  onChangeText={text =>
+                    setEditForm(prev => ({ ...prev, hoTen: text }))
+                  }
                   placeholder="Nhập họ và tên"
                   placeholderTextColor="#A0A0A0"
                 />
@@ -187,40 +343,62 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Hàng: Lớp (chỉ đọc) */}
+          {/* Lớp */}
           <View style={styles.infoRow}>
             <View style={styles.iconWrapper}>
-              <Ionicons name="people-outline" size={18} color="#4A90D9" />
+              <Ionicons
+                name="people-outline"
+                size={18}
+                color="#4A90D9"
+              />
             </View>
+
             <View style={styles.infoContent}>
               <Text style={styles.label}>Lớp</Text>
-              <Text style={styles.valueReadOnly}>{profile.lop}</Text>
+              <Text style={styles.valueReadOnly}>
+                {profile.lop}
+              </Text>
             </View>
           </View>
 
-          {/* Hàng: Ngành học (chỉ đọc) */}
+          {/* Ngành học */}
           <View style={styles.infoRow}>
             <View style={styles.iconWrapper}>
-              <Ionicons name="book-outline" size={18} color="#4A90D9" />
+              <Ionicons
+                name="book-outline"
+                size={18}
+                color="#4A90D9"
+              />
             </View>
+
             <View style={styles.infoContent}>
               <Text style={styles.label}>Ngành học</Text>
-              <Text style={styles.valueReadOnly}>{profile.nganh}</Text>
+              <Text style={styles.valueReadOnly}>
+                {profile.nganh}
+              </Text>
             </View>
           </View>
 
-          {/* Hàng: Email */}
+          {/* Email */}
           <View style={styles.infoRow}>
             <View style={styles.iconWrapper}>
-              <Ionicons name="mail-outline" size={18} color="#4A90D9" />
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color="#4A90D9"
+              />
             </View>
+
             <View style={styles.infoContent}>
               <Text style={styles.label}>Email</Text>
+
               {isEditing ? (
                 <TextInput
                   style={styles.input}
                   value={editForm.email}
-                  onChangeText={(text) => setEditForm((prev) => ({ ...prev, email: text }))}
+                  onChangeText={text =>
+                    setEditForm(prev => ({ ...prev, email: text }))
+                  }
                   placeholder="Nhập email"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -232,29 +410,42 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Hàng: Số điện thoại */}
+          {/* Số điện thoại */}
           <View style={styles.infoRow}>
             <View style={styles.iconWrapper}>
-              <Ionicons name="call-outline" size={18} color="#4A90D9" />
+              <Ionicons
+                name="call-outline"
+                size={18}
+                color="#4A90D9"
+              />
             </View>
+
             <View style={styles.infoContent}>
               <Text style={styles.label}>Số điện thoại</Text>
+
               {isEditing ? (
                 <TextInput
                   style={styles.input}
                   value={editForm.soDienThoai}
-                  onChangeText={(text) => setEditForm((prev) => ({ ...prev, soDienThoai: text }))}
+                  onChangeText={text =>
+                    setEditForm(prev => ({
+                      ...prev,
+                      soDienThoai: text,
+                    }))
+                  }
                   placeholder="Nhập số điện thoại"
                   keyboardType="phone-pad"
                   placeholderTextColor="#A0A0A0"
                 />
               ) : (
-                <Text style={styles.value}>{profile.soDienThoai}</Text>
+                <Text style={styles.value}>
+                  {profile.soDienThoai}
+                </Text>
               )}
             </View>
           </View>
 
-          {/* Nút hành động khi đang chỉnh sửa */}
+          {/* Nút lưu và hủy */}
           {isEditing && (
             <View style={styles.buttonActionGroup}>
               <TouchableOpacity
@@ -264,44 +455,102 @@ const ProfileScreen = ({ navigation }) => {
               >
                 <Text style={styles.cancelButtonText}>Hủy</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.saveButton}
                 activeOpacity={0.8}
                 onPress={handleSaveProfile}
               >
-                <Ionicons name="save-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.saveButtonText}>Lưu thay đổi</Text>
+                <Ionicons
+                  name="save-outline"
+                  size={18}
+                  color="#FFFFFF"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.saveButtonText}>
+                  Lưu thay đổi
+                </Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Tóm tắt bảng điểm */}
+        {/* Bảng điểm */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="trophy-outline" size={20} color="#4A90D9" />
-              <Text style={styles.sectionTitle}>Kết quả học tập</Text>
+              <Ionicons
+                name="trophy-outline"
+                size={20}
+                color="#4A90D9"
+              />
+              <Text style={styles.sectionTitle}>
+                Kết quả học tập
+              </Text>
             </View>
-            <Text style={styles.subCountBadge}>{grades.length} môn</Text>
+
+            <Text style={styles.subCountBadge}>
+              {profileGrades.length} môn
+            </Text>
           </View>
 
           <View style={styles.divider} />
 
-          {grades.map((item) => (
+          {gradesSource === 'cache' && (
+            <Text style={styles.gradeNotice}>
+              Đang hiển thị dữ liệu đã lưu trên thiết bị.
+            </Text>
+          )}
+
+          {gradesError && profileGrades.length > 0 && (
+            <Text style={styles.gradeNotice}>
+              Không thể làm mới điểm số. Đang hiển thị dữ liệu đã lưu.
+            </Text>
+          )}
+
+          {gradesLoading && profileGrades.length === 0 && (
+            <Text style={styles.gradeNotice}>
+              Đang tải bảng điểm...
+            </Text>
+          )}
+
+          {gradesError && profileGrades.length === 0 && (
+            <TouchableOpacity onPress={refreshGrades}>
+              <Text style={styles.gradeNotice}>
+                Không tải được bảng điểm. Nhấn vào đây để thử lại.
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {!gradesLoading && !gradesError && profileGrades.length === 0 && (
+            <Text style={styles.gradeNotice}>
+              Chưa có dữ liệu bảng điểm.
+            </Text>
+          )}
+
+          {profileGrades.map(item => (
             <TouchableOpacity
               key={item.id}
               style={styles.gradeItemCard}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('GradeDetail', { grade: item })}
+              onPress={() =>
+                navigation.navigate('GradeDetail', { grade: item })
+              }
             >
               <View style={styles.gradeHeaderRow}>
                 <View style={styles.gradeTitleContainer}>
-                  <Text style={styles.gradeSubjectName} numberOfLines={1}>
+                  <Text
+                    style={styles.gradeSubjectName}
+                    numberOfLines={1}
+                  >
                     {item.tenMH}
                   </Text>
-                  <Text style={styles.gradeSubjectCode}>{item.maMH}</Text>
+
+                  <Text style={styles.gradeSubjectCode}>
+                    {item.maMH ?? '—'}
+                  </Text>
                 </View>
+
                 <View
                   style={[
                     styles.statusBadge,
@@ -325,49 +574,57 @@ const ProfileScreen = ({ navigation }) => {
 
               <View style={styles.gradeScoresRow}>
                 <View style={styles.scoreBlock}>
-                  <Text style={styles.scoreBlockLabel}>Quá trình</Text>
+                  <Text style={styles.scoreBlockLabel}>
+                    Quá trình
+                  </Text>
                   <Text
                     style={[
                       styles.scoreBlockValue,
                       { color: getScoreColor(item.diemQuaTrinh) },
                     ]}
                   >
-                    {item.diemQuaTrinh !== null && item.diemQuaTrinh !== undefined
-                      ? item.diemQuaTrinh.toFixed(1)
-                      : '--'}
+                    {formatScore(item.diemQuaTrinh)}
                   </Text>
                 </View>
 
                 <View style={styles.scoreBlock}>
-                  <Text style={styles.scoreBlockLabel}>Giữa kỳ</Text>
+                  <Text style={styles.scoreBlockLabel}>
+                    Giữa kỳ
+                  </Text>
                   <Text
                     style={[
                       styles.scoreBlockValue,
                       { color: getScoreColor(item.diemGiuaKy) },
                     ]}
                   >
-                    {item.diemGiuaKy !== null && item.diemGiuaKy !== undefined
-                      ? item.diemGiuaKy.toFixed(1)
-                      : '--'}
+                    {formatScore(item.diemGiuaKy)}
                   </Text>
                 </View>
 
                 <View style={styles.scoreBlock}>
-                  <Text style={styles.scoreBlockLabel}>Cuối kỳ</Text>
+                  <Text style={styles.scoreBlockLabel}>
+                    Cuối kỳ
+                  </Text>
                   <Text
                     style={[
                       styles.scoreBlockValue,
                       { color: getScoreColor(item.diemCuoiKy) },
                     ]}
                   >
-                    {item.diemCuoiKy !== null && item.diemCuoiKy !== undefined
-                      ? item.diemCuoiKy.toFixed(1)
-                      : 'Chưa có'}
+                    {item.diemCuoiKy === null ||
+                    item.diemCuoiKy === undefined ||
+                    item.diemCuoiKy === ''
+                      ? 'Chưa có'
+                      : formatScore(item.diemCuoiKy)}
                   </Text>
                 </View>
 
                 <View style={styles.chevronWrapper}>
-                  <Ionicons name="chevron-forward" size={18} color="#B0B0B0" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color="#B0B0B0"
+                  />
                 </View>
               </View>
             </TouchableOpacity>
@@ -609,6 +866,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
+  gradeNotice: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 18,
+  },
   gradeItemCard: {
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
@@ -645,18 +908,18 @@ const styles = StyleSheet.create({
   statusCompleted: {
     backgroundColor: '#E8F8F0',
   },
-  statusCompletedText: {
-    color: '#27AE60',
-    fontSize: 11,
-    fontWeight: '600',
-  },
   statusInProgress: {
     backgroundColor: '#FEF3C7',
   },
-  statusInProgressText: {
-    color: '#D97706',
+  statusBadgeText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  statusCompletedText: {
+    color: '#27AE60',
+  },
+  statusInProgressText: {
+    color: '#D97706',
   },
   gradeScoresRow: {
     flexDirection: 'row',

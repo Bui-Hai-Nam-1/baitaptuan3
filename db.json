@@ -1,0 +1,208 @@
+
+{
+  "students": [
+    {
+      "id": "SV001",
+      "name": "Nguyễn Văn An",
+      "class": "CNTT-K20A",
+      "email": "an@example.com",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SV002",
+      "name": "Trần Thị Bình",
+      "class": "CNTT-K20A",
+      "email": "binh@example.com",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SV003",
+      "name": "Lê Hoàng Nam",
+      "class": "CNTT-K20B",
+      "email": "nam@example.com",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SV004",
+      "name": "Phạm Thu Hà",
+      "class": "CNTT-K20B",
+      "email": "ha@example.com",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SV005",
+      "name": "Đỗ Minh Đức",
+      "class": "CNTT-K20C",
+      "email": "duc@example.com",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    }
+  ],
+  "courses": [
+    {
+      "id": "CS101",
+      "name": "Lập trình di động",
+      "credits": 3,
+      "teacher": "Trần Văn Bình",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "CS102",
+      "name": "Cơ sở dữ liệu",
+      "credits": 3,
+      "teacher": "Nguyễn Thị Lan",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "CS103",
+      "name": "Lập trình Web",
+      "credits": 4,
+      "teacher": "Phạm Quốc Huy",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "CS104",
+      "name": "Cấu trúc dữ liệu và giải thuật",
+      "credits": 3,
+      "teacher": "Lê Minh Tuấn",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "CS105",
+      "name": "Phát triển phần mềm",
+      "credits": 2,
+      "teacher": "Hoàng Thu Trang",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "SCH001",
+      "courseId": "CS101",
+      "day": "Monday",
+      "startTime": "07:30",
+      "endTime": "09:30",
+      "room": "A301",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SCH002",
+      "courseId": "CS102",
+      "day": "Monday",
+      "startTime": "09:45",
+      "endTime": "11:45",
+      "room": "B202",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SCH003",
+      "courseId": "CS103",
+      "day": "Tuesday",
+      "startTime": "13:00",
+      "endTime": "15:00",
+      "room": "C105",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SCH004",
+      "courseId": "CS104",
+      "day": "Wednesday",
+      "startTime": "07:30",
+      "endTime": "09:30",
+      "room": "A205",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "SCH005",
+      "courseId": "CS105",
+      "day": "Friday",
+      "startTime": "13:30",
+      "endTime": "15:30",
+      "room": "B104",
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    }
+  ],
+  "assignments": [
+    {
+      "id": "BT001",
+      "courseId": "CS101",
+      "title": "Tạo ứng dụng Todo",
+      "dueDate": "2026-11-05",
+      "completed": false,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "BT002",
+      "courseId": "CS102",
+      "title": "Thiết kế cơ sở dữ liệu quản lý sinh viên",
+      "dueDate": "2026-11-08",
+      "completed": false,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "BT003",
+      "courseId": "CS103",
+      "title": "Xây dựng giao diện website",
+      "dueDate": "2026-11-10",
+      "completed": true,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "BT004",
+      "courseId": "CS104",
+      "title": "Bài tập sắp xếp và tìm kiếm",
+      "dueDate": "2026-11-12",
+      "completed": false,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "BT005",
+      "courseId": "CS105",
+      "title": "Viết tài liệu phân tích yêu cầu",
+      "dueDate": "2026-11-15",
+      "completed": false,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    }
+  ],
+  "grades": [
+    {
+      "id": "KQ001",
+      "courseId": "CS101",
+      "processScore": 8.5,
+      "midtermScore": 8,
+      "finalScore": null,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "KQ002",
+      "courseId": "CS102",
+      "processScore": 7.5,
+      "midtermScore": 8,
+      "finalScore": 7.8,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "KQ003",
+      "courseId": "CS103",
+      "processScore": 9,
+      "midtermScore": 8.5,
+      "finalScore": 8.8,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "KQ004",
+      "courseId": "CS104",
+      "processScore": 7,
+      "midtermScore": 7.5,
+      "finalScore": null,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    },
+    {
+      "id": "KQ005",
+      "courseId": "CS105",
+      "processScore": 8,
+      "midtermScore": 8.5,
+      "finalScore": 9,
+      "updatedAt": "2026-10-26T08:00:00.000Z"
+    }
+  ]
+}

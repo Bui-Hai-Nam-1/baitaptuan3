@@ -1,97 +1,170 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Ứng dụng quản lý học tập
 
-# Getting Started
+Ứng dụng di động được xây dựng bằng React Native CLI, hỗ trợ xem lịch học, môn học, bài tập, điểm số và thông tin cá nhân. Dữ liệu được lấy từ REST API sử dụng JSON Server và có hỗ trợ lưu cache để xem dữ liệu khi offline.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 1. Công nghệ sử dụng
 
-## Step 1: Start Metro
+- React Native CLI
+- JavaScript
+- React Navigation
+- JSON Server
+- AsyncStorage
+- NetInfo
+- Android Emulator
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## 2. Yêu cầu môi trường
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Cài đặt các công cụ sau trước khi chạy dự án:
 
-```sh
-# Using npm
+- Node.js và npm
+- JDK phù hợp với phiên bản React Native
+- Android Studio và Android SDK
+- Android Emulator hoặc thiết bị Android
+- Git
+
+Tham khảo hướng dẫn thiết lập môi trường chính thức: https://reactnative.dev/docs/set-up-your-environment
+
+## 3. Cài đặt dự án
+
+Clone repository:
+
+```bash
+git clone https://github.com/Bui-Hai-Nam-1/baitaptuan3.git
+cd baitaptuan3
+```
+
+Cài đặt các thư viện:
+
+```bash
+npm install
+```
+
+## 4. Khởi chạy JSON Server
+
+Mở một terminal tại thư mục gốc của dự án và cài JSON Server phiên bản 0.17.4 nếu máy chưa có:
+
+```bash
+npm install -g json-server@0.17.4
+```
+
+Khởi chạy API từ file `db.json`:
+
+```bash
+json-server --watch db.json --host 0.0.0.0 --port 3000 --delay 800
+```
+
+Giữ terminal này mở trong suốt quá trình sử dụng ứng dụng.
+
+Các endpoint chính:
+
+- `GET /students`
+- `GET /courses`
+- `GET /sessions`
+- `GET /assignments`
+- `GET /grades`
+
+Trên Android Emulator, ứng dụng truy cập API thông qua địa chỉ `http://10.0.2.2:3000`.
+
+## 5. Chạy ứng dụng Android
+
+Mở terminal thứ hai tại thư mục dự án và khởi chạy Metro:
+
+```bash
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+Giữ Metro đang chạy. Mở terminal thứ ba, sau đó chạy:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+```bash
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+Đảm bảo Android Emulator đã khởi động hoặc thiết bị Android đã được kết nối trước khi chạy lệnh.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## 6. Kiểm tra chức năng offline
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+1. Khởi chạy JSON Server và ứng dụng khi có mạng.
+2. Mở các màn hình cần kiểm tra để dữ liệu được tải và lưu cache.
+3. Dừng JSON Server bằng `Ctrl + C` trong terminal đang chạy JSON Server.
+4. Giữ Metro hoạt động và tải lại màn hình trong ứng dụng.
+5. Kiểm tra dữ liệu đã lưu cache có hiển thị khi API không truy cập được hay không.
 
-```sh
-bundle install
+Kết quả offline phụ thuộc vào dữ liệu đã được cache trước đó. Các thao tác cập nhật dữ liệu khi offline có thể cần cơ chế đồng bộ riêng.
+
+## 7. Cấu trúc thư mục chính
+
+```text
+baitaptuan3/
+├── android/
+├── src/
+│   ├── api/
+│   ├── config/
+│   ├── data/
+│   ├── hooks/
+│   ├── navigation/
+│   ├── screens/
+│   └── storage/
+├── db.json
+├── App.tsx
+├── package.json
+└── README.md
 ```
 
-Then, and every time you update your native dependencies, run:
+## 8. Xử lý lỗi thường gặp
 
-```sh
-bundle exec pod install
+- **Không kết nối được API:** Kiểm tra JSON Server có đang chạy ở cổng `3000` không.
+- **Android Emulator không truy cập được API:** Kiểm tra địa chỉ API trong `src/config/index.js`; Android Emulator thường dùng `http://10.0.2.2:3000`.
+- **Ứng dụng không chạy:** Kiểm tra môi trường React Native, Android SDK và chạy lại `npm install` nếu cần.
+- **Dữ liệu offline không hiển thị:** Mở ứng dụng khi API hoạt động trước để tạo cache.
+
+## 9. Tài liệu tham khảo
+
+- React Native: https://reactnative.dev/
+- React Navigation: https://reactnavigation.org/
+- JSON Server: https://github.com/typicode/json-server
+## Luồng dữ liệu và xử lý xung đột (B5)
+
+### 1. Sơ đồ luồng dữ liệu
+
+```mermaid
+flowchart TD
+    A[Màn hình] --> B[Custom Hook]
+    B --> C[Service]
+    C --> D{Có mạng?}
+    D -->|Có| E[API - JSON Server]
+    E --> F[Cập nhật Cache]
+    F --> B
+    D -->|Không| G[Đọc Cache]
+    G --> B
+    C --> H[Outbox - hàng đợi thay đổi]
+    H --> I[Đồng bộ khi có mạng]
+    I --> E
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### 2. Vai trò của từng thành phần
 
-```sh
-# Using npm
-npm run ios
+- **Màn hình (Screen):** Hiển thị dữ liệu và nhận thao tác của người dùng.
+- **Custom Hook:** Quản lý trạng thái tải dữ liệu, dữ liệu hiển thị, lỗi và thao tác làm mới.
+- **Service:** Gọi API, xử lý dữ liệu và phối hợp việc lưu hoặc đọc cache.
+- **Cache:** Lưu dữ liệu đã tải để có thể hiển thị khi API không truy cập được.
+- **Outbox:** Hàng đợi lưu các thao tác ghi dữ liệu chưa đồng bộ lên máy chủ.
+- **API:** JSON Server cung cấp dữ liệu và xử lý các yêu cầu đọc, thêm hoặc cập nhật dữ liệu.
 
-# OR using Yarn
-yarn ios
-```
+### 3. Cách xử lý xung đột dữ liệu (B5)
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Khi ứng dụng hoạt động offline, dữ liệu trên thiết bị có thể khác dữ liệu trên máy chủ do người dùng hoặc thiết bị khác đã cập nhật.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+Quy trình xử lý đề xuất:
 
-## Step 3: Modify your app
+1. **Lưu thay đổi:** Ghi thao tác cần đồng bộ vào Outbox, gồm mã bản ghi, dữ liệu thay đổi và thời điểm tạo thao tác.
+2. **Đồng bộ lại:** Khi có mạng, gửi các thao tác trong Outbox lên API theo thứ tự phù hợp.
+3. **Kiểm tra xung đột:** So sánh phiên bản hoặc thời điểm cập nhật của bản ghi trên thiết bị và máy chủ.
+4. **Giải quyết xung đột:** Nếu cả hai phía đều đã thay đổi cùng một bản ghi, áp dụng quy tắc được xác định trước. Có thể ưu tiên dữ liệu mới hơn nếu có timestamp đáng tin cậy; với dữ liệu quan trọng, nên yêu cầu người dùng lựa chọn.
+5. **Cập nhật dữ liệu:** Sau khi đồng bộ thành công, cập nhật cache và xóa thao tác tương ứng khỏi Outbox.
+6. **Xử lý lỗi:** Nếu đồng bộ thất bại do mất mạng hoặc lỗi máy chủ, giữ thao tác trong Outbox để thử lại sau.
 
-Now that you have successfully run the app, let's make changes!
+### 4. Lưu ý về triển khai
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+Cache giúp đọc dữ liệu khi offline, nhưng bản thân cache không đảm bảo đồng bộ các thay đổi khi có mạng trở lại. Outbox và cơ chế phát hiện, giải quyết xung đột cần được triển khai riêng nếu ứng dụng hỗ trợ chỉnh sửa dữ liệu offline.
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+JSON Server mặc định không cung cấp cơ chế kiểm soát phiên bản và giải quyết xung đột đầy đủ. Vì vậy, nếu cần bảo đảm tính nhất quán trong môi trường nhiều thiết bị, cần bổ sung trường phiên bản hoặc timestamp và quy tắc đồng bộ phù hợp.
